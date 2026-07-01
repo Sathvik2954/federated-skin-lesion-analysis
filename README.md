@@ -16,6 +16,7 @@ A complete, from-scratch federated learning pipeline comparing four aggregation 
 - [Convergence](#convergence)
 - [Per-Class Analysis](#per-class-analysis)
 - [Communication Cost](#communication-cost)
+- [Radar Comparison](#radar-comparison)
 - [Methodology](#methodology)
 - [Project Structure](#project-structure)
 - [How to Run](#how-to-run)
@@ -51,11 +52,11 @@ This repository investigates:
 
 2. **Weighted FedAvg fails consistently and severely under client size imbalance.** When client dataset size correlates with class dominance (a realistic scenario — large hospitals often see more of the common conditions), size-weighted averaging amplifies that dominance. F1 degrades 28.6% and G-mean degrades 47.5% from mild to extreme imbalance on ISIC-2019 — roughly 3–4× faster than any other method, on **both** datasets independently.
 
-3. **Federation provides dramatic gains for data-poor, class-imbalanced clients.** On ISIC-2019, the best local-only model (trained on a 1,529-sample client) achieved a G-mean of just **0.05** — essentially unable to classify most lesion types beyond its own majority classes. Federation with Ditto lifted this to **0.50**, a 10× improvement.
+3. **Federation provides dramatic gains for data-poor, class-imbalanced clients.** On ISIC-2019, the best local-only model (trained on a 1,529-sample client) achieved a G-mean of just **0.05** — essentially unable to classify most lesion types beyond its own majority classes. Federation with Ditto lifted this to **0.50**, a 10× improvement. On HAM10000, the rarest class (`df`, 115 samples) gained **+0.48 accuracy** through federation alone.
 
 4. **FedProx produces the most interpretable global models.** Despite not always winning on raw accuracy, FedProx achieves the highest Grad-CAM IoU between client and global model attention maps on ISIC-2019 (0.529) — its proximal regularisation term appears to constrain client models into a more visually consistent representation space.
 
-5. **Federation creates genuine, class-specific trade-offs.** On HAM10000, federation lifts the rare `df` class by **+0.48 accuracy** (from near-zero local performance) while costing the `bcc` class **−0.35 accuracy** at one specialist client — a direct illustration of the generalization-vs-personalization trade-off inherent to FL.
+5. **Federation creates genuine, class-specific trade-offs.** On HAM10000, federation lifts the rare `df` class by **+0.48 accuracy** while costing the `bcc` class **−0.35 accuracy** at one specialist client. On ISIC-2019, VASC (a visually distinctive class perfectly learned by its specialist client) drops from 1.0 to 0.50 after federation — a direct illustration of the generalization-vs-personalization trade-off inherent to FL.
 
 6. **Centralized training remains the upper bound, as expected**, but the FL-to-centralized gap is consistent and modest — Ditto reaches roughly 85–90% of centralized F1 on both datasets, despite training on disjoint, never-pooled, non-IID data.
 
@@ -111,12 +112,12 @@ How does each aggregation strategy degrade as client class imbalance worsens? Al
 | FedProx         | 0.607      | 0.584          | 0.550         | −9.4%          |
 | Ditto           | 0.599      | 0.579          | 0.561         | **−6.4%**      |
 
-**G-Mean degradation (ISIC-2019, mild → extreme):** FedAvg −13.5%, Weighted FedAvg **−47.5%**, FedProx −7.9% (best), Ditto −10.7%.
+**G-Mean degradation (ISIC-2019, mild → extreme):** FedAvg −13.5%, Weighted FedAvg **−47.5%**, FedProx −7.9% (most stable on G-mean), Ditto −10.7%.
 
-![ISIC-2019 Severity Ablation](Results/ISIC-2019/Figures/ablation_severity.png)
 ![HAM10000 Severity Ablation](Results/HAM10000/Figures/ablation_severity.png)
+![ISIC-2019 Severity Ablation](Results/ISIC-2019/Figures/ablation_severity.png)
 
-**Takeaway:** Ditto is the most stable method on F1 macro; FedProx is the most stable on G-mean (minority-class recall). Weighted FedAvg is unambiguously the worst choice whenever client size correlates with class dominance — a very plausible real-world scenario.
+**Takeaway:** Ditto is the most stable method on F1 macro across both datasets. FedProx is the most stable on G-mean (minority-class recall). Weighted FedAvg is unambiguously the worst choice whenever client size correlates with class dominance — a very plausible real-world scenario.
 
 ---
 
@@ -124,34 +125,61 @@ How does each aggregation strategy degrade as client class imbalance worsens? Al
 
 Grad-CAM class activation maps are compared between each client's local model and the aggregated global model, using IoU averaged over 50 held-out test images, computed from **real saved client checkpoints** — not simulated approximations.
 
+### HAM10000
+
 ![HAM10000 Grad-CAM](Results/HAM10000/Figures/gradcam_real_clients.png)
+
+| Client      | Samples | IoU vs Global |
+| ----------- | ------- | ------------- |
+| Client 0    | 1,352   | 0.800         |
+| Client 1    | 1,482   | 0.900         |
+| Client 2    | 5,178   | 0.909         |
+| **Average** | —       | **0.870**     |
+
+The dominant client (Client 2, 65% of training data) shows the highest IoU — confirming that the global model is most influenced by the largest data contributor.
+
+### ISIC-2019
+
 ![ISIC-2019 Grad-CAM](Results/ISIC-2019/Figures/gradcam_real_clients.png)
 
-| Dataset   | Highest IoU Method | IoU   |
-| --------- | ------------------ | ----- |
-| HAM10000  | FedAvg             | 0.870 |
-| ISIC-2019 | FedProx            | 0.529 |
+| Client      | Samples | IoU vs Global |
+| ----------- | ------- | ------------- |
+| Client 0    | 5,304   | 0.909         |
+| Client 1    | 11,772  | 0.611         |
+| Client 2    | 1,529   | 0.714         |
+| **Average** | —       | **0.745**     |
 
-All models consistently attend to the central lesion region of the dermoscopic image rather than background skin — a basic sanity check confirming that every method learns clinically sensible features, regardless of quantitative ranking.
+On ISIC-2019, Client 0 achieves the highest IoU despite not being the largest client — because the test image belongs to AK/BKL type lesions, which are Client 0's majority classes. This demonstrates that IoU alignment depends on both data volume **and** class relevance to the test sample, not size alone — a more nuanced explainability finding than a simple size-alignment relationship.
+
+All models consistently attend to the central lesion region rather than background skin — confirming that all four methods learn clinically sensible features regardless of quantitative ranking.
 
 ---
 
 ## Convergence
 
+### HAM10000
+
 ![HAM10000 Convergence](Results/HAM10000/Figures/convergence_clean.png)
+
+- FedAvg, FedProx, and Ditto all converge steadily with a clear upward trend through round 20.
+- Weighted FedAvg oscillates heavily (0.43–0.67) throughout all 20 rounds with no stable plateau.
+- FedProx shows an erratic dip at round 15 before recovering — a known behaviour when the proximal term temporarily over-constrains client updates.
+
+### ISIC-2019
+
 ![ISIC-2019 Convergence](Results/ISIC-2019/Figures/convergence_clean.png)
 
-- **FedAvg and Weighted FedAvg** show a large, persistent gap on ISIC-2019 — Weighted FedAvg never closes the roughly 0.18 F1 deficit across all 20 rounds, directly confirming the severity ablation finding.
-- **FedProx and Ditto** track each other closely on ISIC-2019, repeatedly crossing throughout training and converging to nearly identical final validation scores (0.836 vs 0.836) despite using fundamentally different mechanisms — proximal regularisation versus personalized dual-model training.
-- None of the methods have fully plateaued by round 20 on either dataset, suggesting further rounds could modestly improve all methods without changing their relative ranking.
+- FedProx and Ditto track each other extremely closely throughout all 20 rounds, converging to nearly identical final validation scores (0.836 vs 0.836) despite using fundamentally different mechanisms.
+- Weighted FedAvg trails by a persistent ~0.18 F1 gap across all 20 rounds, never recovering.
+- None of the methods have fully plateaued by round 20, suggesting further rounds could modestly improve all methods without changing their relative ranking.
 
 ---
 
 ## Per-Class Analysis
 
-![HAM10000 FL Gain Per Class](Results/HAM10000/Figures/fl_gain_per_class.png)
+### HAM10000 — FL Gain Per Class
 
-On HAM10000, federation produces clear winners and losers per class relative to the best local-only model:
+![HAM10000 FL Gain Per Class](Results/HAM10000/Figures/fl_gain_per_class.png)
 
 | Class   | Δ Accuracy (FL − Local) | Interpretation                                                                   |
 | ------- | ----------------------- | -------------------------------------------------------------------------------- |
@@ -163,49 +191,89 @@ On HAM10000, federation produces clear winners and losers per class relative to 
 | `vasc`  | −0.21                   | Specialist cost — partly in dominant client's majority group                     |
 | `bcc`   | **−0.35**               | Largest specialist cost — federation dilutes one client's strong local expertise |
 
-This is the clearest illustration in the project of FL's core trade-off: classes well-represented across multiple clients improve substantially, while a client's own specialty class can see reduced performance as the global model averages across more diverse data.
+### ISIC-2019 — FL Gain Per Class
+
+![ISIC-2019 FL Gain Per Class](Results/ISIC-2019/Figures/fl_gain_per_class.png)
+
+| Class  | Δ Accuracy (FL − Local) | Interpretation                                                     |
+| ------ | ----------------------- | ------------------------------------------------------------------ |
+| `AK`   | +0.36                   | Minority class — large gain from cross-client knowledge            |
+| `BCC`  | +0.38                   | Strong gain despite local model being moderate on this class       |
+| `BKL`  | +0.15                   | Moderate minority class gain                                       |
+| `DF`   | +0.46                   | Near-zero local recall lifted substantially                        |
+| `MEL`  | −0.07                   | Marginal cost — minor shift from local specialist performance      |
+| `NV`   | +0.11                   | Largest class — already well-learned, small additional gain        |
+| `SCC`  | −0.43                   | Specialist cost — Client 2's majority class diluted by federation  |
+| `VASC` | **−0.50**               | Largest cost — Client 2 had perfect local VASC recall (1.0 → 0.50) |
+
+The ISIC-2019 per-class pattern highlights an important nuance: `VASC` is visually distinctive enough that a small specialist client (1,529 samples) learned it perfectly in isolation — but federation averaged that specialist knowledge away. This is the clearest example in the project of when personalized FL methods like Ditto should be preferred over standard aggregation.
+
+### HAM10000 — Confusion Matrix (Best Method: FedAvg)
 
 ![HAM10000 Confusion Matrix](Results/HAM10000/Figures/confusion_matrix_best.png)
 
-**Clinically notable confusion:** on HAM10000, roughly 29% of true `mel` (melanoma) samples are misclassified as `nv` (benign nevus) under the best FL model — a false-negative pattern for a malignant condition, and the most important limitation surfaced by this analysis. This would need to be addressed before any consideration of clinical use.
+**Clinically notable:** roughly 29% of true `mel` (melanoma) samples are misclassified as `nv` (benign nevus) — a false-negative for a malignant condition.
+
+### ISIC-2019 — Confusion Matrices (All Methods)
+
+![ISIC-2019 Confusion Matrices](Results/ISIC-2019/Figures/confusion_matrices_all.png)
+
+**Clinically notable:** `SCC` (squamous cell carcinoma) is frequently misclassified as `MEL` (melanoma) or `NV` — both malignant-vs-malignant and malignant-vs-benign confusions that would require further model refinement before clinical consideration.
 
 ---
 
 ## Communication Cost
 
-Computed analytically from ResNet-18's parameter count (~11.2M parameters), assuming standard upload-plus-download transfer per client per round.
+Computed analytically from ResNet-18's parameter count (~11.2M parameters), assuming standard upload-plus-download transfer per client per round. Cost is identical across both datasets since the same backbone is used for both.
 
-| Method          | Total Communication (20 rounds, 3 clients)                       |
-| --------------- | ---------------------------------------------------------------- |
-| FedAvg          | 5.37 GB                                                          |
-| Weighted FedAvg | 5.37 GB                                                          |
-| FedProx         | 5.37 GB                                                          |
-| **Ditto**       | **10.73 GB** (2× — maintains both a global and a personal model) |
+| Method          | Per Round (3 clients) | Total (20 rounds)                                             |
+| --------------- | --------------------- | ------------------------------------------------------------- |
+| FedAvg          | 268.5 MB              | 5.37 GB                                                       |
+| Weighted FedAvg | 268.5 MB              | 5.37 GB                                                       |
+| FedProx         | 268.5 MB              | 5.37 GB                                                       |
+| **Ditto**       | 537.0 MB              | **10.73 GB** (2× — maintains both global and personal models) |
 
-Ditto's communication overhead is exactly double, as expected from its architecture. Given that FedProx achieves comparable or better robustness on G-mean and IoU at half the communication cost, **FedProx is the recommended choice when bandwidth is constrained**, while **Ditto is recommended when maximum robustness to severe non-IID conditions is the priority** and communication cost is not the limiting factor.
+FedProx achieves comparable or better G-mean and IoU robustness to Ditto at exactly half the communication cost — making it the preferred choice in bandwidth-constrained deployments. Ditto is recommended when maximum F1 macro and robustness to severe non-IID conditions are the priority.
 
-![Communication Cost — HAM10000](Results/HAM10000/Figures/communication_cost.png)
+![HAM10000 Communication Cost](Results/HAM10000/Figures/communication_cost.png)
+![ISIC-2019 Communication Cost](Results/ISIC-2019/Figures/communication_cost.png)
+
+---
+
+## Radar Comparison
+
+Multi-metric comparison across all aggregation methods, with centralized and local-only baselines shown as reference lines.
+
+### HAM10000
+
+![HAM10000 Radar Chart](Results/HAM10000/Figures/radar_chart.png)
+
+### ISIC-2019
+
+![ISIC-2019 Radar Chart](Results/ISIC-2019/Figures/radar_chart.png)
+
+The radar charts highlight a consistent pattern across both datasets: Weighted FedAvg is visibly smaller on G-Mean and Balanced Accuracy axes, confirming its specific weakness on minority-class recall. FedAvg, FedProx, and Ditto form a tight cluster across most metrics, with Ditto pulling ahead on Balanced Accuracy and FedProx on G-Mean.
 
 ---
 
 ## Methodology
 
-| Component               | Detail                                                                                                           |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Backbone                | ResNet-18, ImageNet pretrained                                                                                   |
-| Clients                 | 3 (simulated)                                                                                                    |
-| Communication rounds    | 20 (main runs), 10 (ablation runs)                                                                               |
-| Local epochs per round  | 3                                                                                                                |
-| Optimizer               | AdamW, lr = 1e-4, weight decay = 1e-5                                                                            |
-| Loss                    | Class-weighted Cross-Entropy                                                                                     |
-| FedProx μ               | 0.001 (kept consistent in both local loss and server-side aggregation)                                           |
-| Ditto λ                 | 0.005                                                                                                            |
-| Train / test split      | 80 / 20, stratified, `random_state=42`, held out _before_ any client partitioning to prevent data leakage        |
-| Non-IID partition       | Disjoint sample assignment by class majority, verified programmatically with overlap assertions                  |
-| Domain shift simulation | Per-client Gaussian noise (σ = 0, 10, 20)                                                                        |
-| Best model selection    | Highest validation F1 macro checkpoint across all rounds                                                         |
-| Explainability          | Grad-CAM (`layer4`), IoU averaged over 50 random held-out test images, using real saved client model checkpoints |
-| Calibration             | Expected Calibration Error (15 bins, L1 norm)                                                                    |
+| Component               | Detail                                                                                                          |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Backbone                | ResNet-18, ImageNet pretrained                                                                                  |
+| Clients                 | 3 (simulated)                                                                                                   |
+| Communication rounds    | 20 (main runs), 10 (ablation runs)                                                                              |
+| Local epochs per round  | 3                                                                                                               |
+| Optimizer               | AdamW, lr = 1e-4, weight decay = 1e-5                                                                           |
+| Loss                    | Class-weighted Cross-Entropy                                                                                    |
+| FedProx μ               | 0.001 (consistent in both local loss and server-side aggregation)                                               |
+| Ditto λ                 | 0.005                                                                                                           |
+| Train / test split      | 80 / 20, stratified, `random_state=42`, held out _before_ any client partitioning — no data leakage             |
+| Non-IID partition       | Disjoint sample assignment by class majority, verified programmatically with overlap assertions                 |
+| Domain shift simulation | Per-client Gaussian noise (σ = 0, 10, 20) to simulate real-world imaging heterogeneity across sites             |
+| Best model selection    | Highest validation F1 macro checkpoint across all rounds saved and used for final evaluation                    |
+| Explainability          | Grad-CAM (`layer4`), IoU averaged over 50 random held-out test images using real saved client model checkpoints |
+| Calibration             | Expected Calibration Error (15 bins, L1 norm)                                                                   |
 
 All evaluation is performed on a **strictly held-out test set** that is never seen by any client during training, by the local-only baselines, or by the centralized baseline — eliminating any risk of data leakage inflating reported metrics.
 
@@ -232,12 +300,13 @@ federated-skin-lesion-classification/
 └── Results/
     ├── HAM10000/
     │   ├── Figures/      # convergence, Grad-CAM, confusion matrices,
-    │   │                 # radar chart, ablation plots, per-class charts
+    │   │                 # radar chart, ablation plots, per-class charts,
+    │   │                 # communication cost, FL gain per class
     │   └── Tables/       # comparison table, ablation results,
     │                     # communication cost, full round history
     └── ISIC-2019/
-        ├── Figures/      # (same structure)
-        └── Tables/       # (same structure)
+        ├── Figures/      # (same structure as HAM10000)
+        └── Tables/       # (same structure as HAM10000)
 ```
 
 ---
@@ -252,29 +321,28 @@ pip install -r requirements.txt
 
 ### 2. Download datasets
 
-Download the datasets from Kaggle:
 - **HAM10000**: https://www.kaggle.com/datasets/kmader/skin-cancer-mnist-ham10000
-- **ISIC-2019**: https://www.kaggle.com/datasets/andrewmvd/isic-2019
+- **ISIC-2019**: https://www.kaggle.com/datasets/salviohexia/isic-2019-skin-lesion-images-for-classification
 
 ### 3. Run notebooks (GPU recommended — tested on Kaggle T4/P100)
 
-**HAM10000:**
+**HAM10000** — single notebook, runs all 4 methods + ablation + validation in sequence:
 
 ```
 Notebooks/HAM10000/FL_HAM10000_Training_&_Validation.ipynb
 ```
 
-A single notebook runs training for all 4 methods plus the severity ablation, followed by validation, in sequence.
-
-**ISIC-2019** (split across 3 notebooks due to Kaggle's roughly 9-hour GPU session limit):
+**ISIC-2019** — split across 3 notebooks due to Kaggle's ~9 hour GPU session limit:
 
 ```
 1. Notebooks/ISIC-2019/FL_ISIC2019_Training_1.ipynb
-   → save output as a Kaggle dataset (e.g. "isic-fl-part-a")
+   (FedAvg + Weighted FedAvg — 20 main rounds + ablation)
+   → save Kaggle output as dataset "isic-fl-part-a"
 
 2. Notebooks/ISIC-2019/FL_ISIC2019_Training_2.ipynb
-   → add "isic-fl-part-a" as an input dataset
-   → save output as a Kaggle dataset (e.g. "isic-fl-part-b")
+   (FedProx + Ditto — 20 main rounds + ablation)
+   → add "isic-fl-part-a" as input dataset
+   → save Kaggle output as dataset "isic-fl-part-b"
 
 3. Notebooks/ISIC-2019/FL_ISIC2019_Validation.ipynb
    → add both "isic-fl-part-a" and "isic-fl-part-b" as inputs
@@ -287,10 +355,10 @@ A single notebook runs training for all 4 methods plus the severity ablation, fo
 
 - **Only 3 simulated clients** — real-world federated deployments typically involve more participants with more varied data volumes and distributions.
 - **ResNet-18** is a lightweight backbone chosen for training speed across many experimental configurations; a larger backbone may shift absolute performance numbers without necessarily changing relative method rankings.
-- **No differential privacy** is applied — this project studies aggregation strategy behavior, not privacy-utility trade-offs.
-- **20 communication rounds** may not represent full convergence for all methods, particularly FedProx and Ditto on ISIC-2019, both of which were still improving at the final round.
-- **Centralized baseline** uses the same local-epoch budget as the FL clients for a fair comparison, not extensive independent hyperparameter tuning — its reported performance should be read as an FL-comparable upper bound, not a state-of-the-art benchmark for these datasets.
-- **Malignant-benign confusion** (e.g. melanoma vs. nevus) remains present across all methods and would require further work — larger models, more rounds, class-specific loss weighting, or ensembling — before any realistic clinical consideration.
+- **No differential privacy** is applied — this project studies aggregation strategy behaviour, not privacy-utility trade-offs.
+- **20 communication rounds** may not represent full convergence for all methods — particularly FedProx and Ditto on ISIC-2019, both of which were still improving at the final round.
+- **Centralized baseline** uses the same local-epoch budget as the FL clients for a fair comparison, not extensive independent hyperparameter tuning — its reported performance should be read as an FL-comparable upper bound, not a state-of-the-art benchmark.
+- **Malignant-benign confusion** (e.g. melanoma vs. nevus on HAM10000; SCC vs. MEL on ISIC-2019) remains present across all methods and would require further work — larger models, more rounds, class-specific loss weighting, or ensembling — before any realistic clinical consideration.
 
 ---
 
