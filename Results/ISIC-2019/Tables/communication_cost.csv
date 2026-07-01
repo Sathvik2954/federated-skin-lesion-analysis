@@ -1,0 +1,5 @@
+Method,Total_20R_GB,Note
+fedavg,5.37 GB,standard
+weighted_fedavg,5.37 GB,standard
+fedprox,5.37 GB,standard
+ditto,10.73 GB,2× (global+personal)
