@@ -1,4 +1,4 @@
-﻿# Federated Learning for Skin Lesion Classification
+# Federated Learning for Skin Lesion Classification
 
 ### A Comparative Study Under Extreme Non-IID Class Imbalance
 
@@ -50,9 +50,9 @@ This repository investigates:
 
 1. **Ditto is the most robust method against increasing non-IID severity, on both datasets independently.** As client class imbalance worsens from mild to extreme, Ditto's F1 degrades only 6.4% on ISIC-2019 - the smallest decline of any method tested, replicated on HAM10000 as well.
 
-2. **Weighted FedAvg fails consistently and severely under client size imbalance.** When client dataset size correlates with class dominance (a realistic scenario - large hospitals often see more of the common conditions), size-weighted averaging amplifies that dominance. F1 degrades 28.6% and G-mean degrades 47.5% from mild to extreme imbalance on ISIC-2019 - roughly 3–4�- faster than any other method, on **both** datasets independently.
+2. **Weighted FedAvg fails consistently and severely under client size imbalance.** When client dataset size correlates with class dominance (a realistic scenario - large hospitals often see more of the common conditions), size-weighted averaging amplifies that dominance. F1 degrades 28.6% and G-mean degrades 47.5% from mild to extreme imbalance on ISIC-2019 - roughly 3–4× faster than any other method, on **both** datasets independently.
 
-3. **Federation provides dramatic gains for data-poor, class-imbalanced clients.** On ISIC-2019, the best local-only model (trained on a 1,529-sample client) achieved a G-mean of just **0.05** - essentially unable to classify most lesion types beyond its own majority classes. Federation with Ditto lifted this to **0.50**, a 10�- improvement. On HAM10000, the rarest class (`df`, 115 samples) gained **+0.48 accuracy** through federation alone.
+3. **Federation provides dramatic gains for data-poor, class-imbalanced clients.** On ISIC-2019, the best local-only model (trained on a 1,529-sample client) achieved a G-mean of just **0.05** - essentially unable to classify most lesion types beyond its own majority classes. Federation with Ditto lifted this to **0.50**, a 10× improvement. On HAM10000, the rarest class (`df`, 115 samples) gained **+0.48 accuracy** through federation alone.
 
 4. **FedProx produces the most interpretable global models.** Despite not always winning on raw accuracy, FedProx achieves the highest Grad-CAM IoU between client and global model attention maps on ISIC-2019 (0.529) - its proximal regularisation term appears to constrain client models into a more visually consistent representation space.
 
@@ -245,7 +245,7 @@ Computed analytically from ResNet-18's parameter count (~11.2M parameters), assu
 | FedAvg          | 268.5 MB              | 5.37 GB                                                       |
 | Weighted FedAvg | 268.5 MB              | 5.37 GB                                                       |
 | FedProx         | 268.5 MB              | 5.37 GB                                                       |
-| **Ditto**       | 537.0 MB              | **10.73 GB** (2�- - maintains both global and personal models) |
+| **Ditto**       | 537.0 MB              | **10.73 GB** (2× - maintains both global and personal models) |
 
 FedProx achieves comparable or better G-mean and IoU robustness to Ditto at exactly half the communication cost - making it the preferred choice in bandwidth-constrained deployments. Ditto is recommended when maximum F1 macro and robustness to severe non-IID conditions are the priority.
 
