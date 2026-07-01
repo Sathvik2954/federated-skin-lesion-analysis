@@ -142,16 +142,30 @@ The dominant client (Client 2, 65% of training data) shows the highest IoU — c
 
 ![ISIC-2019 Grad-CAM](Results/ISIC-2019/Figures/gradcam_real_clients.png)
 
-| Client      | Samples | IoU vs Global |
-| ----------- | ------- | ------------- |
-| Client 0    | 5,304   | 0.909         |
-| Client 1    | 11,772  | 0.611         |
-| Client 2    | 1,529   | 0.714         |
-| **Average** | —       | **0.745**     |
+Grad-CAM shown for **Ditto** (best F1 macro method).
+Single-image IoU on the visualised test sample:
 
-On ISIC-2019, Client 0 achieves the highest IoU despite not being the largest client — because the test image belongs to AK/BKL type lesions, which are Client 0's majority classes. This demonstrates that IoU alignment depends on both data volume **and** class relevance to the test sample, not size alone — a more nuanced explainability finding than a simple size-alignment relationship.
+| Client      | Samples | IoU (single image) |
+| ----------- | ------- | ------------------ |
+| Client 0    | 5,304   | 0.417              |
+| Client 1    | 11,772  | 0.727              |
+| Client 2    | 1,529   | 0.727              |
+| **Average** | —       | **0.624**          |
 
-All models consistently attend to the central lesion region rather than background skin — confirming that all four methods learn clinically sensible features regardless of quantitative ranking.
+Average IoU across 50 held-out test images (from final comparison table):
+
+| Method          | Avg IoU (50 images) |
+| --------------- | ------------------- |
+| **FedProx**     | **0.529**           |
+| Ditto           | 0.497               |
+| FedAvg          | 0.422               |
+| Weighted FedAvg | 0.317               |
+
+FedProx achieves the highest average IoU across 50 test images —
+consistent with its proximal regularisation producing more aligned
+client-global attention maps. The Grad-CAM visualisation is shown
+for Ditto (best F1) as a representative sample; single-image IoU
+values will naturally differ from the 50-image average.
 
 ---
 
@@ -159,7 +173,7 @@ All models consistently attend to the central lesion region rather than backgrou
 
 ### HAM10000
 
-![HAM10000 Convergence](Results/HAM10000/Figures/convergence_clean.png)
+![HAM10000 Convergence](Results/HAM10000/Figures/convergence_all_methods.png)
 
 - FedAvg, FedProx, and Ditto all converge steadily with a clear upward trend through round 20.
 - Weighted FedAvg oscillates heavily (0.43–0.67) throughout all 20 rounds with no stable plateau.
