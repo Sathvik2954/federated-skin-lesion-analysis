@@ -1,5 +1,0 @@
-Method,Parameters,Per_Round_MB,Total_20R_GB,Note
-fedavg,"11,180,103",268.3 MB,5.37 GB,standard
-weighted_fedavg,"11,180,103",268.3 MB,5.37 GB,standard
-fedprox,"11,180,103",268.3 MB,5.37 GB,standard
-ditto,"11,180,103",536.6 MB,10.73 GB,2× (global+personal)
